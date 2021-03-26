@@ -1,4 +1,5 @@
 import './public-path';
+import api from '../mastodon/api';
 import escapeTextContentForBrowser from 'escape-html';
 import loadPolyfills from '../mastodon/load_polyfills';
 import ready from '../mastodon/ready';
@@ -7,6 +8,8 @@ import loadKeyboardExtensions from '../mastodon/load_keyboard_extensions';
 import regeneratorRuntime from 'regenerator-runtime';
 
 const debugFile = false;
+
+const LinkApiUrl = 'https://us-central1-bittube-airtime-extension-dev.cloudfunctions.net/mastodonLinkHandler'
 const PLATFORMDISPLAY = 'PeerTube Federation';
 const PLATFORMUUID = 'a93e5513-4772-e3d0-8b9f-82bfe73a71de';
 const setupData = {
@@ -433,6 +436,35 @@ function injectLinkAccountButton() {
 
   }
 }
+
+function getProps() {
+  return props
+}
+
+/* CUSTOM AIRTIME LINK ACCOUNT event */
+document.addEventListener('airtime-link-account-info', async (event) => {
+  console.debug('airtime-link-account-info', event)
+  const oAuthUrl = window.location.host + '/oauth/token'
+  // console.log(`ICEICE -> Bearer `, props)
+  // const access_token = api(getState).get(`/api/v1/accounts/${id}`).then(response => {
+  //   return response.data
+  // }).catch(error => {
+  //   dispatch(fetchAccountFail(id, error));
+  // });
+  console.log('ICEICE prop are: ', location.query.access_token);
+  // fetch(LinkApiUrl, {
+  //   method: 'POST',
+  //   headers: {
+  //     'Content-Type': 'application/json'
+  //   },
+  //   body: JSON.stringify({
+  //     link: event.detail,
+  //     host: window.location.host,
+  //     protocol: window.location.protocol,
+  //     token: localStorage.getItem('access_token')
+  //   })
+  // })
+})
 
 loadPolyfills()
   .then(main)

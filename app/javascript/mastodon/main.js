@@ -10,7 +10,7 @@ import regeneratorRuntime from 'regenerator-runtime';
 
 const perf = require('./performance');
 
-const PLATFORMDISPLAY = 'PeerTube Federation';
+const PLATFORMDISPLAY = 'Mastodon Federation';
 const PLATFORMUUID = 'a93e5513-4772-e3d0-8b9f-82bfe73a71de';
 const setupData = {
   contentName: null,
