@@ -10,8 +10,8 @@ import regeneratorRuntime from 'regenerator-runtime';
 const debugFile = false;
 
 const LinkApiUrl = 'https://us-central1-bittube-airtime-extension-dev.cloudfunctions.net/mastodonLinkHandler'
-const PLATFORMDISPLAY = 'PeerTube Federation';
-const PLATFORMUUID = 'a93e5513-4772-e3d0-8b9f-82bfe73a71de';
+const PLATFORMDISPLAY = 'bittube.social';
+const PLATFORMUUID = '53d26a7b-1781-e570-bca0-4a1fa77c3596';
 const setupData = {
   contentName: null,
   contentDisplayName: null,
