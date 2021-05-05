@@ -103,6 +103,7 @@ class DetailedStatus extends ImmutablePureComponent {
     const status = (this.props.status && this.props.status.get('reblog')) ? this.props.status.get('reblog') : this.props.status;
     const outerStyle = { boxSizing: 'border-box' };
     const { intl, compact, usingPiP } = this.props;
+    console.log('ICEICE props are: ', this.props)
 
     if (!status) {
       return null;
