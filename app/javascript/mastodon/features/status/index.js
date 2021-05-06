@@ -184,6 +184,7 @@ class Status extends ImmutablePureComponent {
 
   componentDidMount () {
     attachFullscreenListener(this.onFullScreenChange);
+    setContentIdEmpty();
   }
 
   componentWillReceiveProps (nextProps) {
@@ -487,7 +488,6 @@ class Status extends ImmutablePureComponent {
 
   componentWillUnmount () {
     detachFullscreenListener(this.onFullScreenChange);
-    setContentIdEmpty();
   }
 
   onFullScreenChange = () => {
