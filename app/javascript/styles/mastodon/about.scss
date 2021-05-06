@@ -578,10 +578,11 @@ $small-breakpoint: 960px;
     left: -40px;
     bottom: 25px;
 
-    // img {
+    img {
+      margin: 7%;
     //   height: 190px;
     //   width: auto;
-    // }
+    }
   }
 
   &__short-description {
