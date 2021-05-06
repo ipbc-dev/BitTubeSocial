@@ -16,6 +16,7 @@ import classNames from 'classnames';
 import Icon from 'mastodon/components/icon';
 import AnimatedNumber from 'mastodon/components/animated_number';
 import PictureInPicturePlaceholder from 'mastodon/components/picture_in_picture_placeholder';
+// import { setContentIdFromAccount } from 'mastodon/airtime-asign';
 
 const messages = defineMessages({
   public_short: { id: 'privacy.public.short', defaultMessage: 'Public' },
@@ -103,12 +104,13 @@ class DetailedStatus extends ImmutablePureComponent {
     const status = (this.props.status && this.props.status.get('reblog')) ? this.props.status.get('reblog') : this.props.status;
     const outerStyle = { boxSizing: 'border-box' };
     const { intl, compact, usingPiP } = this.props;
-    console.log('ICEICE props are: ', this.props)
-
+    // const acctName = status.get('account');
+    
     if (!status) {
       return null;
     }
-
+    // console.log('ICEICE detailed status setting AirtimeID to: ', acctName);
+    // setContentIdFromAccount(acctName);
     let media           = '';
     let applicationLink = '';
     let reblogLink = '';

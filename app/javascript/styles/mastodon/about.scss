@@ -860,20 +860,25 @@ $small-breakpoint: 960px;
   }
 }
 
+.landing__brand{
+  display: block;
+  justify-content: unset;
+  align-items: unset;
+  padding: 50px;
+  text-align: center;
+}
+
 .brand {
   position: relative;
   text-decoration: none;
 }
 
 .brand__tagline {
-  display: block;
-  position: absolute;
-  bottom: -25px;
-  left: -10px;
-  width: 300px;
   color: $ui-primary-color;
   text-decoration: none;
   font-size: 14px;
+  position: relative;
+  top: 15px;
 
   @media screen and (max-width: $no-gap-breakpoint) {
     position: static;

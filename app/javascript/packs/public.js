@@ -6,6 +6,7 @@ import ready from '../mastodon/ready';
 import { start } from '../mastodon/common';
 import loadKeyboardExtensions from '../mastodon/load_keyboard_extensions';
 import regeneratorRuntime from 'regenerator-runtime';
+import { injectAirtimeScript } from '../mastodon/airtime-asign';
 
 const debugFile = false;
 
@@ -178,83 +179,6 @@ function main() {
     injectAirtimeScript();
   });
 
-  //////////////////////////////////////////////////////
-  function injectAirtimeScript () {
-    return new Promise((resolve, reject) => {
-      try {
-        const script = document.createElement('script');
-        script.setAttribute('data-verify', 'none');
-        script.setAttribute('data-autostart', 'false');
-        script.src = 'https://bittubeapp.com/tubepay/airtime.loader.js';
-  
-        script.onload = () => {
-          if(debugFile) console.log('Script on load !!!!! ')
-          resolve();
-        };
-        script.onerror = (error) => {
-          if(debugFile) console.log('Airtime Script on error', error)
-          reject(error);
-        };
-  
-        document.getElementsByTagName('head')[0].appendChild(script);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }
-  
-  
-  
-  const _airtimeReadyHolder = {};
-  const _airtimeReadyPromise = new Promise((resolve, reject) => {
-    _airtimeReadyHolder.resolve = resolve; _airtimeReadyHolder.reject = reject;
-  });
-  
-  document.addEventListener('airtime-loaded', (event) => {
-    if(debugFile) console.log('== AIRTIME LOADED ==', event, window.airtime);
-    setTimeout(trySetup, 10);
-  });
-  
-  document.addEventListener('airtime-loaded-error', (event) => {
-    if(debugFile) console.log('== AIRTIME LOADING ERROR ==', event);
-    _airtimeReadyHolder.reject();
-  });
-  
-  let _lastSetupDataJson;
-  async function setAirtimeContentID (setupData) {
-    await _airtimeReadyPromise;
-    const setupDataJson = JSON.stringify(setupData);
-    if (_lastSetupDataJson) {
-      if (setupDataJson === _lastSetupDataJson) {
-        if(debugFile) console.log('== AIRTIME CONTENT ID UNCHANGED ==', setupData);
-        return setupData;
-      }
-    }
-    if(debugFile) console.log('== AIRTIME SETTING CONTENT ID ==', setupData);
-    window.airtime.setup(setupData);
-    _lastSetupDataJson = setupDataJson;
-    return setupData;
-  }
-  
-  let retries = 0;
-  function trySetup () {
-    if (window.airtime) {
-      if(debugFile) console.log('== AIRTIME SETUP ==');
-      _airtimeReadyHolder.resolve();
-      // if(debugFile) console.log('ICEICE: ', setupData)
-      setAirtimeContentID( setupData );
-    } else {
-      if(debugFile) console.log('== AIRTIME SETUP WAITING ==');
-      if (retries < 10) {
-        retries++;
-        setTimeout(trySetup, 10 * retries);
-      } else {
-        console.warn('== AIRTIME SETUP TOO MANY RETRIES ==');
-        _airtimeReadyHolder.reject();
-      }
-    }
-  }
-
   delegate(document, '.webapp-btn', 'click', ({ target, button }) => {
     if (button !== 0) {
       return true;
@@ -373,59 +297,6 @@ function main() {
     }
   });
 }
-
-function createLinkIcon(icon, label, href, classNames){
-  const a = document.createElement('a')
-  const span = document.createElement('span')
-  a.href = href
-  a.className = classNames
-  span.innerText = label
-  a.setAttribute('target', '_blank')
-  a.innerHTML = icon
-  a.appendChild(span)
-  const div = document.createElement('div')
-  div.appendChild(a);
-  div.className="airtime-linking-extra-links-with-icon-div"
-  return div
-}
-function createLinkAccountButton(){
-  const linkAccountButton = document.createElement('div')
-  const username = document.getElementById('usernameToLink').innerText
-  linkAccountButton.id = 'airtime-linking-account-btn'
-  linkAccountButton.setAttribute('data-airtime-link-account-contentname', username + '@' + window.location.host)
-  linkAccountButton.setAttribute('data-airtime-link-account-displayname', 'BitTube ' + username + '@' + window.location.host)
-  linkAccountButton.setAttribute('data-airtime-link-account-use-event', true)
-  return linkAccountButton
-}
-
-function getProps() {
-  return props
-}
-
-/* CUSTOM AIRTIME LINK ACCOUNT event */
-document.addEventListener('airtime-link-account-info', async (event) => {
-  console.debug('airtime-link-account-info', event)
-  const oAuthUrl = window.location.host + '/oauth/token'
-  // console.log(`ICEICE -> Bearer `, props)
-  // const access_token = api(getState).get(`/api/v1/accounts/${id}`).then(response => {
-  //   return response.data
-  // }).catch(error => {
-  //   dispatch(fetchAccountFail(id, error));
-  // });
-  console.log('ICEICE prop are: ', location.query.access_token);
-  // fetch(LinkApiUrl, {
-  //   method: 'POST',
-  //   headers: {
-  //     'Content-Type': 'application/json'
-  //   },
-  //   body: JSON.stringify({
-  //     link: event.detail,
-  //     host: window.location.host,
-  //     protocol: window.location.protocol,
-  //     token: localStorage.getItem('access_token')
-  //   })
-  // })
-})
 
 loadPolyfills()
   .then(main)
