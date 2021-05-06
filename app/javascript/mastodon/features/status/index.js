@@ -56,6 +56,7 @@ import { boostModal, deleteModal } from '../../initial_state';
 import { attachFullscreenListener, detachFullscreenListener, isFullscreen } from '../ui/util/fullscreen';
 import { textForScreenReader, defaultMediaVisibility } from '../../components/status';
 import Icon from 'mastodon/components/icon';
+import { setContentIdEmpty } from '../../airtime-asign';
 
 const messages = defineMessages({
   deleteConfirm: { id: 'confirmations.delete.confirm', defaultMessage: 'Delete' },
@@ -486,6 +487,7 @@ class Status extends ImmutablePureComponent {
 
   componentWillUnmount () {
     detachFullscreenListener(this.onFullScreenChange);
+    setContentIdEmpty();
   }
 
   onFullScreenChange = () => {

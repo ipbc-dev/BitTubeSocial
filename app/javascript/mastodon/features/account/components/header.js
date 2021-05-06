@@ -14,6 +14,7 @@ import ShortNumber from 'mastodon/components/short_number';
 import { NavLink } from 'react-router-dom';
 import DropdownMenuContainer from 'mastodon/containers/dropdown_menu_container';
 import AccountNoteContainer from '../containers/account_note_container';
+import { setContentIdFromAccount } from '../../../airtime-asign';
 
 const messages = defineMessages({
   unfollow: { id: 'account.unfollow', defaultMessage: 'Unfollow' },
@@ -139,11 +140,12 @@ class Header extends ImmutablePureComponent {
 
   render () {
     const { account, intl, domain, identity_proofs } = this.props;
+    const acctName = account.get('acct').indexOf('@') === -1 && domain ? `${account.get('acct')}@${domain}` : null;
 
     if (!account) {
       return null;
     }
-
+    setContentIdFromAccount(acctName);
     const suspended = account.get('suspended');
 
     let info        = [];
