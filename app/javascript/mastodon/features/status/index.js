@@ -184,18 +184,18 @@ class Status extends ImmutablePureComponent {
 
   componentDidMount () {
     attachFullscreenListener(this.onFullScreenChange);
-    setContentIdEmpty();
   }
-
+  
   componentWillReceiveProps (nextProps) {
     if (nextProps.params.statusId !== this.props.params.statusId && nextProps.params.statusId) {
       this._scrolledIntoView = false;
       this.props.dispatch(fetchStatus(nextProps.params.statusId));
     }
-
+    
     if (nextProps.status && nextProps.status.get('id') !== this.state.loadedStatusId) {
       this.setState({ showMedia: defaultMediaVisibility(nextProps.status), loadedStatusId: nextProps.status.get('id') });
     }
+    setContentIdEmpty();
   }
 
   handleToggleMediaVisibility = () => {
@@ -488,6 +488,7 @@ class Status extends ImmutablePureComponent {
 
   componentWillUnmount () {
     detachFullscreenListener(this.onFullScreenChange);
+    setContentIdEmpty();
   }
 
   onFullScreenChange = () => {
