@@ -107,10 +107,10 @@ class DetailedStatus extends ImmutablePureComponent {
 
     setTimeout(() => {
       if(document.getElementsByClassName('display-name__account').length > 0){
-        const postOwner = document.getElementsByClassName('display-name__account')[0].innerHTML;
+        let postOwner = document.getElementsByClassName('display-name__account')[0].innerHTML.replace('@', '');
         if( postOwner !== null){
           console.log('ICEICE detailed status setting AirtimeID to: ', postOwner);
-          setContentIdFromAccount(postOwner);
+          setContentIdFromAccount(postOwner + '@bittube.social');
         }
       }
     }, 1000);
