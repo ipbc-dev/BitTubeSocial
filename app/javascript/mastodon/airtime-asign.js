@@ -13,7 +13,7 @@ const setupData = {
 let _lastSetupDataJson;
 
 export function setContentIdFromAccount (acctName) {
-  console.log('ICEICE acctName at airtimeAsign is: ', acctName);
+  // console.log('ICEICE acctName at airtimeAsign is: ', acctName);
   const setupData = {
     contentName: acctName,
     contentDisplayName: acctName !== null ? 'BitTube.social ' + acctName : null,
@@ -30,7 +30,7 @@ export function setContentIdEmpty () {
     platformUUID: PLATFORMUUID,
     platformDisplayName: PLATFORMDISPLAY,
   };
-  console.log('ICEICE Airtime setContentIdEmpty()');
+  // console.log('ICEICE Airtime setContentIdEmpty()');
   return setAirtimeContentID(setupData);
 }
 
@@ -39,11 +39,11 @@ export async function setAirtimeContentID (setupData) {
   const setupDataJson = JSON.stringify(setupData);
   if (_lastSetupDataJson) {
     if (setupDataJson === _lastSetupDataJson) {
-      console.log('ICEICE == AIRTIME CONTENT ID UNCHANGED ==', setupData);
+      // console.log('ICEICE == AIRTIME CONTENT ID UNCHANGED ==', setupData);
       return setupData;
     }
   }
-  console.log('ICEICE == AIRTIME SETTING CONTENT ID ==', setupData);
+  // console.log('ICEICE == AIRTIME SETTING CONTENT ID ==', setupData);
   window.airtime.setup(setupData);
   _lastSetupDataJson = setupDataJson;
   return setupData;
