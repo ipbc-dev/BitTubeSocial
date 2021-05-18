@@ -16,7 +16,7 @@ export function setContentIdFromAccount (acctName) {
   // console.log('ICEICE acctName at airtimeAsign is: ', acctName);
   const setupData = {
     contentName: acctName,
-    contentDisplayName: acctName !== null ? 'BitTube.social ' + acctName : null,
+    contentDisplayName: acctName !== null ? acctName : null,
     platformUUID: PLATFORMUUID,
     platformDisplayName: PLATFORMDISPLAY,
   };
