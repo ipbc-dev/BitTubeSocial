@@ -63,7 +63,7 @@ class User < ApplicationRecord
   devise :two_factor_backupable,
          otp_number_of_backup_codes: 10
 
-  devise :registerable, :recoverable, :rememberable, :trackable, :validatable,
+  devise :registerable, :recoverable, :rememberable, :validatable,
          :confirmable
 
   include Omniauthable
@@ -82,12 +82,20 @@ class User < ApplicationRecord
   has_many :webauthn_credentials, dependent: :destroy
 
   has_one :invite_request, class_name: 'UserInviteRequest', inverse_of: :user, dependent: :destroy
-  accepts_nested_attributes_for :invite_request, reject_if: ->(attributes) { attributes['text'].blank? }
+  accepts_nested_attributes_for :invite_request, reject_if: ->(attributes) { attributes['text'].blank? && !Setting.require_invite_text }
+  validates :invite_request, presence: true, on: :create, if: :invite_text_required?
 
   validates :locale, inclusion: I18n.available_locales.map(&:to_s), if: :locale?
   validates_with BlacklistedEmailValidator, on: :create
   validates_with EmailMxValidator, if: :validate_email_dns?
   validates :agreement, acceptance: { allow_nil: false, accept: [true, 'true', '1'] }, on: :create
+
+  # Those are honeypot/antispam fields
+  attr_accessor :registration_form_time, :website, :confirm_password
+
+  validates_with RegistrationFormTimeValidator, on: :create
+  validates :website, absence: true, on: :create
+  validates :confirm_password, absence: true, on: :create
 
   scope :recent, -> { order(id: :desc) }
   scope :pending, -> { where(approved: false) }
@@ -120,7 +128,7 @@ class User < ApplicationRecord
            to: :settings, prefix: :setting, allow_nil: false
 
   attr_reader :invite_code, :sign_in_token_attempt
-  attr_writer :external
+  attr_writer :external, :bypass_invite_request_check
 
   def confirmed?
     confirmed_at.present?
@@ -144,7 +152,7 @@ class User < ApplicationRecord
 
   def confirm
     new_user      = !confirmed?
-    self.approved = true if open_registrations?
+    self.approved = true if open_registrations? && !sign_up_from_ip_requires_approval?
 
     super
 
@@ -163,6 +171,24 @@ class User < ApplicationRecord
     save!
 
     prepare_new_user! if new_user && approved?
+  end
+
+  def update_sign_in!(request, new_sign_in: false)
+    old_current, new_current = current_sign_in_at, Time.now.utc
+    self.last_sign_in_at     = old_current || new_current
+    self.current_sign_in_at  = new_current
+
+    old_current, new_current = current_sign_in_ip, request.remote_ip
+    self.last_sign_in_ip     = old_current || new_current
+    self.current_sign_in_ip  = new_current
+
+    if new_sign_in
+      self.sign_in_count ||= 0
+      self.sign_in_count  += 1
+    end
+
+    save(validate: false) unless new_record?
+    prepare_returning_user!
   end
 
   def pending?
@@ -194,11 +220,6 @@ class User < ApplicationRecord
 
     update!(approved: true)
     prepare_new_user!
-  end
-
-  def update_tracked_fields!(request)
-    super
-    prepare_returning_user!
   end
 
   def otp_enabled?
@@ -349,15 +370,20 @@ class User < ApplicationRecord
 
   protected
 
-  def send_devise_notification(notification, *args)
+  def send_devise_notification(notification, *args, **kwargs)
     # This method can be called in `after_update` and `after_commit` hooks,
     # but we must make sure the mailer is actually called *after* commit,
     # otherwise it may work on stale data. To do this, figure out if we are
     # within a transaction.
+
+    # It seems like devise sends keyword arguments as a hash in the last
+    # positional argument
+    kwargs = args.pop if args.last.is_a?(Hash) && kwargs.empty?
+
     if ActiveRecord::Base.connection.current_transaction.try(:records)&.include?(self)
-      pending_devise_notifications << [notification, args]
+      pending_devise_notifications << [notification, args, kwargs]
     else
-      render_and_send_devise_message(notification, *args)
+      render_and_send_devise_message(notification, *args, **kwargs)
     end
   end
 
@@ -368,8 +394,8 @@ class User < ApplicationRecord
   end
 
   def send_pending_devise_notifications
-    pending_devise_notifications.each do |notification, args|
-      render_and_send_devise_message(notification, *args)
+    pending_devise_notifications.each do |notification, args, kwargs|
+      render_and_send_devise_message(notification, *args, **kwargs)
     end
 
     # Empty the pending notifications array because the
@@ -382,8 +408,8 @@ class User < ApplicationRecord
     @pending_devise_notifications ||= []
   end
 
-  def render_and_send_devise_message(notification, *args)
-    devise_mailer.send(notification, self, *args).deliver_later
+  def render_and_send_devise_message(notification, *args, **kwargs)
+    devise_mailer.send(notification, self, *args, **kwargs).deliver_later
   end
 
   def set_approved
@@ -406,6 +432,10 @@ class User < ApplicationRecord
 
   def external?
     !!@external
+  end
+
+  def bypass_invite_request_check?
+    @bypass_invite_request_check
   end
 
   def sanitize_languages
@@ -433,9 +463,7 @@ class User < ApplicationRecord
   end
 
   def regenerate_feed!
-    return unless Redis.current.setnx("account:#{account_id}:regeneration", true)
-    Redis.current.expire("account:#{account_id}:regeneration", 1.day.seconds)
-    RegenerationWorker.perform_async(account_id)
+    RegenerationWorker.perform_async(account_id) if Redis.current.set("account:#{account_id}:regeneration", true, nx: true, ex: 1.day.seconds)
   end
 
   def needs_feed_update?
@@ -443,6 +471,10 @@ class User < ApplicationRecord
   end
 
   def validate_email_dns?
-    email_changed? && !(Rails.env.test? || Rails.env.development?)
+    email_changed? && !external? && !(Rails.env.test? || Rails.env.development?)
+  end
+
+  def invite_text_required?
+    Setting.require_invite_text && !invited? && !external? && !bypass_invite_request_check?
   end
 end

@@ -32,26 +32,45 @@ RSpec.describe ActivityPub::FollowersSynchronizationsController, type: :controll
     context 'with signature from example.com' do
       let(:remote_account) { Fabricate(:account, domain: 'example.com', uri: 'https://example.com/instance') }
 
-      before do
-        get :show, params: { account_username: account.username }
-      end
+      subject(:response) { get :show, params: { account_username: account.username } }
+      subject(:body) { body_as_json }
 
       it 'returns http success' do
         expect(response).to have_http_status(200)
       end
 
       it 'returns application/activity+json' do
-        expect(response.content_type).to eq 'application/activity+json'
+        expect(response.media_type).to eq 'application/activity+json'
       end
 
       it 'returns orderedItems with followers from example.com' do
-        json = body_as_json
-        expect(json[:orderedItems]).to be_an Array
-        expect(json[:orderedItems].sort).to eq [follower_1.uri, follower_2.uri]
+        expect(body[:orderedItems]).to be_an Array
+        expect(body[:orderedItems].sort).to eq [follower_1.uri, follower_2.uri]
       end
 
       it 'returns private Cache-Control header' do
         expect(response.headers['Cache-Control']).to eq 'max-age=0, private'
+      end
+
+      context 'when account is permanently suspended' do
+        before do
+          account.suspend!
+          account.deletion_request.destroy
+        end
+
+        it 'returns http gone' do
+          expect(response).to have_http_status(410)
+        end
+      end
+
+      context 'when account is temporarily suspended' do
+        before do
+          account.suspend!
+        end
+
+        it 'returns http forbidden' do
+          expect(response).to have_http_status(403)
+        end
       end
     end
   end

@@ -9,9 +9,9 @@ const redis = require('redis');
 const pg = require('pg');
 const log = require('npmlog');
 const url = require('url');
-const { WebSocketServer } = require('@clusterws/cws');
 const uuid = require('uuid');
 const fs = require('fs');
+const WebSocket = require('ws');
 
 const env = process.env.NODE_ENV || 'development';
 const alwaysRequireAuth = process.env.LIMITED_FEDERATION_MODE === 'true' || process.env.WHITELIST_MODE === 'true' || process.env.AUTHORIZED_FETCH === 'true';
@@ -99,11 +99,11 @@ const startMaster = () => {
     log.warn('UNIX domain socket is now supported by using SOCKET. Please migrate from PORT hack.');
   }
 
-  log.info(`Starting streaming API server master with ${numWorkers} workers`);
+  log.warn(`Starting streaming API server master with ${numWorkers} workers`);
 };
 
 const startWorker = (workerId) => {
-  log.info(`Starting worker ${workerId}`);
+  log.warn(`Starting worker ${workerId}`);
 
   const pgConfigs = {
     development: {
@@ -230,13 +230,13 @@ const startWorker = (workerId) => {
   const FALSE_VALUES = [
     false,
     0,
-    "0",
-    "f",
-    "F",
-    "false",
-    "FALSE",
-    "off",
-    "OFF"
+    '0',
+    'f',
+    'F',
+    'false',
+    'FALSE',
+    'off',
+    'OFF',
   ];
 
   /**
@@ -294,7 +294,7 @@ const startWorker = (workerId) => {
         return;
       }
 
-      client.query('SELECT oauth_access_tokens.resource_owner_id, users.account_id, users.chosen_languages, oauth_access_tokens.scopes, devices.device_id FROM oauth_access_tokens INNER JOIN users ON oauth_access_tokens.resource_owner_id = users.id LEFT OUTER JOIN devices ON oauth_access_tokens.id = devices.access_token_id WHERE oauth_access_tokens.token = $1 AND oauth_access_tokens.revoked_at IS NULL LIMIT 1', [token], (err, result) => {
+      client.query('SELECT oauth_access_tokens.id, oauth_access_tokens.resource_owner_id, users.account_id, users.chosen_languages, oauth_access_tokens.scopes, devices.device_id FROM oauth_access_tokens INNER JOIN users ON oauth_access_tokens.resource_owner_id = users.id LEFT OUTER JOIN devices ON oauth_access_tokens.id = devices.access_token_id WHERE oauth_access_tokens.token = $1 AND oauth_access_tokens.revoked_at IS NULL LIMIT 1', [token], (err, result) => {
         done();
 
         if (err) {
@@ -310,6 +310,7 @@ const startWorker = (workerId) => {
           return;
         }
 
+        req.accessTokenId = result.rows[0].id;
         req.scopes = result.rows[0].scopes.split(' ');
         req.accountId = result.rows[0].account_id;
         req.chosenLanguages = result.rows[0].chosen_languages;
@@ -376,6 +377,8 @@ const startWorker = (workerId) => {
       return 'direct';
     case '/api/v1/streaming/list':
       return 'list';
+    default:
+      return undefined;
     }
   };
 
@@ -451,6 +454,55 @@ const startWorker = (workerId) => {
   };
 
   /**
+   * @typedef SystemMessageHandlers
+   * @property {function(): void} onKill
+   */
+
+  /**
+   * @param {any} req
+   * @param {SystemMessageHandlers} eventHandlers
+   * @return {function(string): void}
+   */
+  const createSystemMessageListener = (req, eventHandlers) => {
+    return message => {
+      const json = parseJSON(message);
+
+      if (!json) return;
+
+      const { event } = json;
+
+      log.silly(req.requestId, `System message for ${req.accountId}: ${event}`);
+
+      if (event === 'kill') {
+        log.verbose(req.requestId, `Closing connection for ${req.accountId} due to expired access token`);
+        eventHandlers.onKill();
+      }
+    };
+  };
+
+  /**
+   * @param {any} req
+   * @param {any} res
+   */
+  const subscribeHttpToSystemChannel = (req, res) => {
+    const systemChannelId = `timeline:access_token:${req.accessTokenId}`;
+
+    const listener = createSystemMessageListener(req, {
+
+      onKill () {
+        res.end();
+      },
+
+    });
+
+    res.on('close', () => {
+      unsubscribe(`${redisPrefix}${systemChannelId}`, listener);
+    });
+
+    subscribe(`${redisPrefix}${systemChannelId}`, listener);
+  };
+
+  /**
    * @param {any} req
    * @param {any} res
    * @param {function(Error=): void} next
@@ -462,6 +514,8 @@ const startWorker = (workerId) => {
     }
 
     accountFromRequest(req, alwaysRequireAuth).then(() => checkScopes(req, channelNameFromPath(req))).then(() => {
+      subscribeHttpToSystemChannel(req, res);
+    }).then(() => {
       next();
     }).catch(err => {
       next(err);
@@ -478,7 +532,8 @@ const startWorker = (workerId) => {
     log.error(req.requestId, err.toString());
 
     if (res.headersSent) {
-      return next(err);
+      next(err);
+      return;
     }
 
     res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
@@ -536,7 +591,9 @@ const startWorker = (workerId) => {
 
     const listener = message => {
       const json = parseJSON(message);
+
       if (!json) return;
+
       const { event, payload, queued_at } = json;
 
       const transmit = () => {
@@ -709,7 +766,7 @@ const startWorker = (workerId) => {
     });
   });
 
-  const wss = new WebSocketServer({ server, verifyClient: wsVerifyClient });
+  const wss = new WebSocket.Server({ server, verifyClient: wsVerifyClient });
 
   /**
    * @typedef StreamParams
@@ -903,6 +960,28 @@ const startWorker = (workerId) => {
     });
 
   /**
+   * @param {WebSocketSession} session
+   */
+  const subscribeWebsocketToSystemChannel = ({ socket, request, subscriptions }) => {
+    const systemChannelId = `timeline:access_token:${request.accessTokenId}`;
+
+    const listener = createSystemMessageListener(request, {
+
+      onKill () {
+        socket.close();
+      },
+
+    });
+
+    subscribe(`${redisPrefix}${systemChannelId}`, listener);
+
+    subscriptions[systemChannelId] = {
+      listener,
+      stopHeartbeat: () => {},
+    };
+  };
+
+  /**
    * @param {string|string[]} arrayOrString
    * @return {string}
    */
@@ -919,6 +998,12 @@ const startWorker = (workerId) => {
 
     req.requestId     = uuid.v4();
     req.remoteAddress = ws._socket.remoteAddress;
+
+    ws.isAlive = true;
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
 
     /**
      * @type {WebSocketSession}
@@ -948,31 +1033,45 @@ const startWorker = (workerId) => {
 
     ws.on('message', data => {
       const json = parseJSON(data);
+
       if (!json) return;
+
       const { type, stream, ...params } = json;
 
       if (type === 'subscribe') {
         subscribeWebsocketToChannel(session, firstParam(stream), params);
       } else if (type === 'unsubscribe') {
-        unsubscribeWebsocketFromChannel(session, firstParam(stream), params)
+        unsubscribeWebsocketFromChannel(session, firstParam(stream), params);
       } else {
         // Unknown action type
       }
     });
+
+    subscribeWebsocketToSystemChannel(session);
 
     if (location.query.stream) {
       subscribeWebsocketToChannel(session, firstParam(location.query.stream), location.query);
     }
   });
 
-  wss.startAutoPing(30000);
+  setInterval(() => {
+    wss.clients.forEach(ws => {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        return;
+      }
+
+      ws.isAlive = false;
+      ws.ping('', false);
+    });
+  }, 30000);
 
   attachServerWithConfig(server, address => {
-    log.info(`Worker ${workerId} now listening on ${address}`);
+    log.warn(`Worker ${workerId} now listening on ${address}`);
   });
 
   const onExit = () => {
-    log.info(`Worker ${workerId} exiting, bye bye`);
+    log.warn(`Worker ${workerId} exiting`);
     server.close();
     process.exit(0);
   };

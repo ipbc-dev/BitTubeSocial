@@ -18,7 +18,9 @@ import { length } from 'stringz';
 import { Tesseract as fetchTesseract } from 'mastodon/features/ui/util/async-components';
 import GIFV from 'mastodon/components/gifv';
 import { me } from 'mastodon/initial_state';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import tesseractCorePath from 'tesseract.js-core/tesseract-core.wasm.js';
+// eslint-disable-next-line import/extensions
 import tesseractWorkerPath from 'tesseract.js/dist/worker.min.js';
 import { assetHost } from 'mastodon/utils/config';
 
@@ -225,7 +227,7 @@ class FocalPointModal extends ImmutablePureComponent {
       const worker = createWorker({
         workerPath: tesseractWorkerPath,
         corePath: tesseractCorePath,
-        langPath: assetHost,
+        langPath: `${assetHost}/ocr/lang-data/`,
         logger: ({ status, progress }) => {
           if (status === 'recognizing text') {
             this.setState({ ocrStatus: 'detecting', progress });
@@ -307,7 +309,7 @@ class FocalPointModal extends ImmutablePureComponent {
     return (
       <div className='modal-root__modal report-modal' style={{ maxWidth: 960 }}>
         <div className='report-modal__target'>
-          <IconButton className='media-modal__close' title={intl.formatMessage(messages.close)} icon='times' onClick={onClose} size={16} />
+          <IconButton className='report-modal__close' title={intl.formatMessage(messages.close)} icon='times' onClick={onClose} size={20} />
           <FormattedMessage id='upload_modal.edit_media' defaultMessage='Edit media' />
         </div>
 
@@ -386,6 +388,7 @@ class FocalPointModal extends ImmutablePureComponent {
             {media.get('type') === 'video' && (
               <Video
                 preview={media.get('preview_url')}
+                frameRate={media.getIn(['meta', 'original', 'frame_rate'])}
                 blurhash={media.get('blurhash')}
                 src={media.get('url')}
                 detailed
